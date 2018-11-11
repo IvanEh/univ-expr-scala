@@ -40,7 +40,8 @@ case class FailedAutomata private[automata](override val state: String,
 
   override def error: Option[String] = Some(errorMessage)
 
-  override def <<(symbol: Symbol): LexerAutomata = ???
+  override def <<(symbol: Symbol): LexerAutomata =
+    throw new IllegalStateException("Automata cannot accept any new symbol in failed state")
 
 }
 
