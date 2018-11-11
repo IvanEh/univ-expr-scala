@@ -23,8 +23,8 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
     val next = automata.accept(Symbol.None)
 
     next.state shouldBe "error"
-    next.isError shouldBe true
-    next.isInstanceOf[FailedLexerAutomata] shouldBe true
-    next.asInstanceOf[FailedLexerAutomata].error shouldBe "error message"
+    next.isFailed shouldBe true
+    next.error shouldBe Some("error message")
+    next.isInstanceOf[FailedAutomata] shouldBe true
   }
 }

@@ -8,26 +8,40 @@ object LexerAutomata {
     .start(initialState)
 }
 
-class LexerAutomata protected[automata](val state: String,
-                            val transitions: Map[String, String],
-                            val maybeError: Option[String] = None,
-                            val errors: Map[String, String]) {
-  def isError: Boolean = maybeError.isDefined
+sealed abstract class LexerAutomata {
+  val state: String
+  def error: Option[String]
+
+  def accept(symbol: Symbol): LexerAutomata
+
+  final def isFailed: Boolean = error.isDefined
+}
+
+case class RunningAutomata private[automata](override val state: String,
+                            transitions: Map[String, String],
+                            errors: Map[String, String]) extends LexerAutomata {
+
+  override def error: Option[String] = None
 
   def accept(symbol: Symbol): LexerAutomata = {
     val nextState = transitions(state)
 
     errors get nextState match {
-      case Some(error) => new FailedLexerAutomata(nextState, transitions, _error = error)
-      case None => new LexerAutomata(nextState, transitions, maybeError, errors)
+      case Some(errorMessage) => FailedAutomata(nextState, errorMessage)
+      case None => this withState nextState
     }
   }
+
+  protected def withState(nextState: String): RunningAutomata = RunningAutomata(nextState, transitions, errors)
 }
 
-class FailedLexerAutomata(state: String,
-                          transitions: Map[String, String],
-                          _error: String) extends LexerAutomata(state, transitions, Some(_error), Map()) {
-  def error: String = maybeError.get
+case class FailedAutomata private[automata](override val state: String,
+                                       errorMessage: String) extends LexerAutomata {
+
+  override def error: Option[String] = Some(errorMessage)
+
+  override def accept(symbol: Symbol): LexerAutomata = ???
+
 }
 
 
@@ -38,5 +52,5 @@ case class AutomataBuilder(transitions: Map[String, String] = Map(),
 
   def translate(from: String, to: String): AutomataBuilder = AutomataBuilder(transitions + (from -> to), errorStates)
 
-  def start(initialState: String): LexerAutomata = new LexerAutomata(initialState, transitions, None, errorStates.toMap)
+  def start(initialState: String): LexerAutomata = new RunningAutomata(initialState, transitions, errorStates.toMap)
 }
