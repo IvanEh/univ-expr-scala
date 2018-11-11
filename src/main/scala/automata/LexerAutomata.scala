@@ -1,23 +1,23 @@
 package automata
 
-object Automata {
+object LexerAutomata {
   def translate(from: String, to: String): AutomataBuilder = AutomataBuilder()
     .translate(from, to)
 
-  def start(initialState: String): Automata = AutomataBuilder()
+  def start(initialState: String): LexerAutomata = AutomataBuilder()
     .start(initialState)
 }
 
-case class Automata(state: String, transitions: Map[String, String]) {
-  def accept(symbol: Symbol): Automata = {
+case class LexerAutomata private(state: String, transitions: Map[String, String]) {
+  def accept(symbol: Symbol): LexerAutomata = {
     val nextState = transitions(state)
 
-    Automata(nextState, transitions)
+    LexerAutomata(nextState, transitions)
   }
 }
 
 case class AutomataBuilder(transitions: Map[String, String] = Map()) {
   def translate(from: String, to: String): AutomataBuilder = AutomataBuilder(transitions + (from -> to))
 
-  def start(initialState: String): Automata = Automata(initialState, transitions)
+  def start(initialState: String): LexerAutomata = LexerAutomata(initialState, transitions)
 }
