@@ -1,9 +1,7 @@
 package automata
 
 object Automata {
-  def start(initialState: String): Automata = ???
+  def start(initialState: String): Automata = Automata(state = initialState)
 }
 
-class Automata {
-  val state: String = ???
-}
+case class Automata(state: String)
