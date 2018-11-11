@@ -12,7 +12,7 @@ sealed abstract class LexerAutomata {
   val state: String
   def error: Option[String]
 
-  def accept(symbol: Symbol): LexerAutomata
+  def <<(symbol: Symbol): LexerAutomata
 
   final def isFailed: Boolean = error.isDefined
 }
@@ -23,7 +23,7 @@ case class RunningAutomata private[automata](override val state: String,
 
   override def error: Option[String] = None
 
-  def accept(symbol: Symbol): LexerAutomata = {
+  def <<(symbol: Symbol): LexerAutomata = {
     val nextState = transitions(state)
 
     errors get nextState match {
@@ -40,7 +40,7 @@ case class FailedAutomata private[automata](override val state: String,
 
   override def error: Option[String] = Some(errorMessage)
 
-  override def accept(symbol: Symbol): LexerAutomata = ???
+  override def <<(symbol: Symbol): LexerAutomata = ???
 
 }
 
@@ -52,5 +52,5 @@ case class AutomataBuilder(transitions: Map[String, String] = Map(),
 
   def translate(from: String, to: String): AutomataBuilder = AutomataBuilder(transitions + (from -> to), errorStates)
 
-  def start(initialState: String): LexerAutomata = new RunningAutomata(initialState, transitions, errorStates.toMap)
+  def start(initialState: String): LexerAutomata = RunningAutomata(initialState, transitions, errorStates.toMap)
 }

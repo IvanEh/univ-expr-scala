@@ -11,7 +11,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
   it should "transition to next state conditionless" in {
     val automata = LexerAutomata.translate("start", "next").start("start")
 
-    val next = automata.accept(Symbol.None)
+    val next = automata << Symbol.None
 
     next.state shouldBe "next"
   }
@@ -20,7 +20,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
       .describeError("error", "error message")
       .start("start")
 
-    val next = automata.accept(Symbol.None)
+    val next = automata << Symbol.None
 
     next.state shouldBe "error"
     next.isFailed shouldBe true
