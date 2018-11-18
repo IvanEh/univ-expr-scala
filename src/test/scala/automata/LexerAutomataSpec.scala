@@ -6,13 +6,13 @@ import scalaz.Alpha.A
 
 class LexerAutomataSpec extends FlatSpec with Matchers {
   "Automata" should "have starting state" in {
-    val automata = LexerAutomata.start("start", ())
+    val automata = LexerAutomata.start("start")
 
     automata.state shouldBe "start"
   }
 
   it should "transition to next state conditionless" in {
-    val automata = LexerAutomata.translate("start", "next").start("start", ())
+    val automata = LexerAutomata.translate[Unit]("start", "next").stateless("start")
 
     val next = automata << Symbol.None
 
@@ -20,9 +20,9 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
   }
 
   it should "transition to error state" in {
-    val automata = LexerAutomata.translate("start", "error")
+    val automata = LexerAutomata.translate[Unit]("start", "error")
       .describeError("error", "error message")
-      .start("start", ())
+      .stateless("start")
 
     val next = automata << Symbol.None
 
@@ -32,9 +32,9 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
     next.isInstanceOf[FailedAutomata[_]] shouldBe true
   }
   it should "transition given matching charachter" in {
-    val automata = LexerAutomata.translate[Unit]("start", "A", Match(Symbol.Char(A)))
+    val automata = LexerAutomata.translate("start", "A", Match(Symbol.Char(A)))
       .translate("start", "end")
-      .start("start", ())
+      .stateless("start")
 
     val next = automata << Symbol.Char(A)
 

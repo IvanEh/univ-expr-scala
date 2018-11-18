@@ -3,6 +3,7 @@ package automata
 import automata.MultiMap._
 
 object LexerAutomata {
+  import AutomataBuilder.AnyAutomataBuilder
 
   def translate[M](from: String, to: String, condition: Condition[M]): AutomataBuilder[M] = AutomataBuilder[M]()
     .translate(from, to, condition)
@@ -12,6 +13,9 @@ object LexerAutomata {
 
   def start[M](initialState: String, initialMemory: M): LexerAutomata[M] = AutomataBuilder[M]()
     .start(initialState, initialMemory)
+
+  def start(initialState: String): LexerAutomata[Unit] = new AnyAutomataBuilder(AutomataBuilder[Unit]())
+    .stateless(initialState)
 }
 
 sealed abstract class LexerAutomata[M] {
@@ -65,10 +69,10 @@ case class FailedAutomata[M] private[automata](override val state: String,
 }
 
 
-case class AutomataBuilder[M](transitions: Map[String, List[TransitionDestination[M]]] = AutomataBuilder.emptyTransitions,
+case class AutomataBuilder[-M](transitions: Map[String, List[TransitionDestination[M]]] = AutomataBuilder.emptyTransitions,
                            errorStates: List[(String, String)] = Nil) {
-  def translate(from: String, to: String, condition: Condition[M]): AutomataBuilder[M] =
-    AutomataBuilder[M](transitions.addBinding(from, to -> condition))
+  def translate[A <: M](from: String, to: String, condition: Condition[A]): AutomataBuilder[A] =
+    AutomataBuilder[A](transitions.addBinding(from, to -> condition))
 
   def describeError(state: String, errorMessage: String): AutomataBuilder[M] = AutomataBuilder[M](transitions,
      (state, errorMessage) :: errorStates )
@@ -76,10 +80,14 @@ case class AutomataBuilder[M](transitions: Map[String, List[TransitionDestinatio
   def translate(from: String, to: String): AutomataBuilder[M] =
     AutomataBuilder[M](transitions.addBinding(from, to -> Else), errorStates)
 
-  def start(initialState: String, initialMemory: M): LexerAutomata[M] =
-    RunningAutomata[M](initialState, transitions mapValues { _.sortBy(_.condition)(Condition.ordering) }, errorStates.toMap, initialMemory)
+  def start[Z <: M](initialState: String, initialMemory: Z): LexerAutomata[Z] =
+    RunningAutomata[Z](initialState, transitions mapValues { _.sortBy(_.condition)(Condition.ordering) }, errorStates.toMap, initialMemory)
 }
 
 object AutomataBuilder {
   val emptyTransitions = Map.empty[String, List[TransitionDestination[Any]]]
+
+  implicit class AnyAutomataBuilder(val automataBuilder: AutomataBuilder[Unit]) extends AnyVal {
+    def stateless(initialState: String): LexerAutomata[Unit] = automataBuilder.start[Unit](initialState, ())
+  }
 }

@@ -1,8 +1,8 @@
 package automata
 
 object MultiMap {
-  implicit class ListMultiMap[A,B](val map: Map[A, List[B]]) extends AnyVal {
-    def addBinding(key: A, value: B): Map[A, List[B]] =
+  implicit class ListMultiMap[K, V](val map: Map[K, List[V]]) extends AnyVal {
+    def addBinding[B >: V](key: K, value: B): Map[K, List[B]] =
       map + (key -> { value :: map.getOrElse(key, Nil) })
   }
 }
