@@ -1,57 +1,81 @@
 package automata
 
+import automata.MultiMap._
+
 object LexerAutomata {
-  def translate(from: String, to: String): AutomataBuilder = AutomataBuilder()
+
+  def translate[M](from: String, to: String, condition: Condition[M]): AutomataBuilder[M] = AutomataBuilder[M]()
+    .translate(from, to, condition)
+
+  def translate[M](from: String, to: String): AutomataBuilder[M] = AutomataBuilder[M]()
     .translate(from, to)
 
-  def start(initialState: String): LexerAutomata = AutomataBuilder()
-    .start(initialState)
+  def start[M](initialState: String, initialMemory: M): LexerAutomata[M] = AutomataBuilder[M]()
+    .start(initialState, initialMemory)
 }
 
-sealed abstract class LexerAutomata {
+sealed abstract class LexerAutomata[M] {
   val state: String
   def error: Option[String]
 
-  def <<(symbol: Symbol): LexerAutomata
+  def <<(symbol: Symbol): LexerAutomata[M]
 
   final def isFailed: Boolean = error.isDefined
 }
 
-case class RunningAutomata private[automata](override val state: String,
-                            transitions: Map[String, String],
-                            errors: Map[String, String]) extends LexerAutomata {
+case class RunningAutomata[M] private[automata](override val state: String,
+                            transitions: Map[String, List[(String, Condition[M])]],
+                            errors: Map[String, String],
+                            memory: M) extends LexerAutomata[M] {
 
   override def error: Option[String] = None
 
-  def <<(symbol: Symbol): LexerAutomata = {
-    val nextState = transitions(state)
+  def <<(symbol: Symbol): LexerAutomata[M] = {
+    val transition = findTransitionFor(symbol)
 
-    errors get nextState match {
-      case Some(errorMessage) => FailedAutomata(nextState, errorMessage)
-      case None => this withState nextState
+    transition match {
+      case Some((nextState, _)) =>
+        errors.get(nextState) match {
+          case Some(errorMessage) => FailedAutomata(nextState, errorMessage)
+          case None => RunningAutomata(nextState, transitions, errors, memory)
+        }
+      case _ => throw new IllegalStateException(s"Exhaustive state transition is not declared for $state")
     }
   }
 
-  protected def withState(nextState: String): RunningAutomata = RunningAutomata(nextState, transitions, errors)
+  private def findTransitionFor(symbol: Symbol) = {
+    val transition =
+      for (stateTransitions <- transitions.get(state).toStream)
+        yield stateTransitions find { _._2 accepts(symbol, memory, "") }
+
+    transition.head
+  }
+
+  protected def withState(nextState: String): RunningAutomata[M] = RunningAutomata(nextState, transitions, errors, memory)
 }
 
-case class FailedAutomata private[automata](override val state: String,
-                                       errorMessage: String) extends LexerAutomata {
+case class FailedAutomata[M] private[automata](override val state: String,
+                                       errorMessage: String) extends LexerAutomata[M] {
 
   override def error: Option[String] = Some(errorMessage)
 
-  override def <<(symbol: Symbol): LexerAutomata =
+  override def <<(symbol: Symbol): LexerAutomata[M] =
     throw new IllegalStateException("Automata cannot accept any new symbol in failed state")
 
 }
 
 
-case class AutomataBuilder(transitions: Map[String, String] = Map(),
+case class AutomataBuilder[M](transitions: Map[String, List[(String, Condition[M])]] = Map.empty[String, List[(String, Condition[M])]],
                            errorStates: List[(String, String)] = Nil) {
-  def describeError(state: String, errorMessage: String): AutomataBuilder = AutomataBuilder(transitions,
+  def translate(from: String, to: String, condition: Condition[M]): AutomataBuilder[M] =
+    AutomataBuilder[M](transitions.addBinding(from, (to, condition)))
+
+  def describeError(state: String, errorMessage: String): AutomataBuilder[M] = AutomataBuilder[M](transitions,
      (state, errorMessage) :: errorStates )
 
-  def translate(from: String, to: String): AutomataBuilder = AutomataBuilder(transitions + (from -> to), errorStates)
+  def translate(from: String, to: String): AutomataBuilder[M] =
+    AutomataBuilder[M](transitions.addBinding(from, (to, Else)), errorStates)
 
-  def start(initialState: String): LexerAutomata = RunningAutomata(initialState, transitions, errorStates.toMap)
+  def start(initialState: String, initialMemory: M): LexerAutomata[M] =
+    RunningAutomata[M](initialState, transitions mapValues { _.sortBy(_._2)(Condition.ordering) }, errorStates.toMap, initialMemory)
 }

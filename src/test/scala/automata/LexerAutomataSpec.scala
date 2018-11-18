@@ -2,15 +2,17 @@ package automata
 
 import org.scalatest.{FlatSpec, Matchers}
 
+import scalaz.Alpha.A
+
 class LexerAutomataSpec extends FlatSpec with Matchers {
   "Automata" should "have starting state" in {
-    val automata = LexerAutomata.start("start")
+    val automata = LexerAutomata.start("start", ())
 
     automata.state shouldBe "start"
   }
 
   it should "transition to next state conditionless" in {
-    val automata = LexerAutomata.translate("start", "next").start("start")
+    val automata = LexerAutomata.translate("start", "next").start("start", ())
 
     val next = automata << Symbol.None
 
@@ -20,14 +22,23 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
   it should "transition to error state" in {
     val automata = LexerAutomata.translate("start", "error")
       .describeError("error", "error message")
-      .start("start")
+      .start("start", ())
 
     val next = automata << Symbol.None
 
     next.state shouldBe "error"
     next.isFailed shouldBe true
     next.error shouldBe Some("error message")
-    next.isInstanceOf[FailedAutomata] shouldBe true
+    next.isInstanceOf[FailedAutomata[_]] shouldBe true
+  }
+  it should "transition given matching charachter" in {
+    val automata = LexerAutomata.translate[Unit]("start", "A", Match(Symbol.Char(A)))
+      .translate("start", "end")
+      .start("start", ())
+
+    val next = automata << Symbol.Char(A)
+
+    next.state shouldBe "A"
   }
 
   "FailedAutomata" should "fail to accept new symbols" in {
