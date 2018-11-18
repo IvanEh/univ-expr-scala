@@ -45,7 +45,7 @@ case class RunningAutomata[M] private[automata](override val state: String,
       case Some(TransitionDestination(nextState, action, _)) =>
         errors.get(nextState) match {
           case Some(errorMessage) => FailedAutomata(nextState, errorMessage)
-          case None => RunningAutomata(nextState, transitions, errors, memory, computeAccumulator(action, symbol))
+          case None => this updated (nextState, memory, computeAccumulator(action, symbol))
         }
       case _ => throw new IllegalStateException(s"Exhaustive state transition is not declared for $state")
     }
@@ -64,7 +64,7 @@ case class RunningAutomata[M] private[automata](override val state: String,
     transition.head
   }
 
-  protected def withState(nextState: String): RunningAutomata[M] = RunningAutomata(nextState, transitions, errors, memory, accumulator)
+  protected final def updated(nextState: String, nextMemory: M, nextAccumulator: String): RunningAutomata[M] = RunningAutomata(nextState, transitions, errors, nextMemory, nextAccumulator)
 }
 
 case class FailedAutomata[M] private[automata](override val state: String,
