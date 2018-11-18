@@ -82,16 +82,16 @@ case class AutomataBuilder[-M](transitions: Map[String, List[TransitionDestinati
                            errorStates: List[(String, String)] = Nil) {
 
   def translate[A <: M](from: String, to: String, condition: Condition[A]): AutomataBuilder[A] =
-    AutomataBuilder[A](transitions.addBinding(from, to -> (NoAction, condition)))
+    AutomataBuilder[A](transitions.addBinding(from, condition -> (to, NoAction)))
 
   def translate(from: String, to: String, action: Action): AutomataBuilder[M] =
-    AutomataBuilder(transitions.addBinding(from, to -> (action, Else)))
+    AutomataBuilder(transitions.addBinding(from, Else -> (to, action)))
 
   def describeError(state: String, errorMessage: String): AutomataBuilder[M] = AutomataBuilder[M](transitions,
      (state, errorMessage) :: errorStates )
 
   def translate(from: String, to: String): AutomataBuilder[M] =
-    AutomataBuilder[M](transitions.addBinding(from, to -> (NoAction, Else)), errorStates)
+    AutomataBuilder[M](transitions.addBinding(from, Else -> (to, NoAction)), errorStates)
 
   def start[Z <: M](initialState: String, initialMemory: Z): LexerAutomata[Z] =
     RunningAutomata[Z](initialState, transitions mapValues { _.sortBy(_.condition)(Condition.ordering) }, errorStates.toMap, initialMemory, "")
