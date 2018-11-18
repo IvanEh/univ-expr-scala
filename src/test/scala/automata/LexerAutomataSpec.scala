@@ -49,7 +49,8 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
 
     val next = automata << Symbol.Char(A)
 
-    next.accumulator shouldBe "a"
+    next.isInstanceOf[RunningAutomata[Unit]] shouldBe true
+    next.asInstanceOf[RunningAutomata[Unit]].accumulator shouldBe "a"
   }
 
   "Stateful Automata" should "do transition given memory check passes" in {
@@ -73,7 +74,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
   }
 
   "FailedAutomata" should "fail to accept new symbols" in {
-    val automata = FailedAutomata("error", "message", "")
+    val automata = FailedAutomata("error", "message")
 
     assertThrows[IllegalStateException] {
       automata << Symbol.None

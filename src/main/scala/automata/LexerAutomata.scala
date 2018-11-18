@@ -23,7 +23,6 @@ object LexerAutomata {
 
 sealed abstract class LexerAutomata[M] {
   val state: String
-  val accumulator: String
   def error: Option[String]
 
   def <<(symbol: Symbol): LexerAutomata[M]
@@ -35,7 +34,7 @@ case class RunningAutomata[M] private[automata](override val state: String,
                             transitions: Map[String, List[TransitionDestination[M]]],
                             errors: Map[String, String],
                             memory: M,
-                            override val accumulator: String) extends LexerAutomata[M] {
+                            accumulator: String) extends LexerAutomata[M] {
 
   override def error: Option[String] = None
 
@@ -45,7 +44,7 @@ case class RunningAutomata[M] private[automata](override val state: String,
     transition match {
       case Some(TransitionDestination(nextState, action, _)) =>
         errors.get(nextState) match {
-          case Some(errorMessage) => FailedAutomata(nextState, errorMessage, accumulator)
+          case Some(errorMessage) => FailedAutomata(nextState, errorMessage)
           case None => RunningAutomata(nextState, transitions, errors, memory, computeAccumulator(action, symbol))
         }
       case _ => throw new IllegalStateException(s"Exhaustive state transition is not declared for $state")
@@ -69,8 +68,7 @@ case class RunningAutomata[M] private[automata](override val state: String,
 }
 
 case class FailedAutomata[M] private[automata](override val state: String,
-                                       errorMessage: String,
-                                       override val accumulator: String) extends LexerAutomata[M] {
+                                       errorMessage: String) extends LexerAutomata[M] {
 
   override def error: Option[String] = Some(errorMessage)
 
