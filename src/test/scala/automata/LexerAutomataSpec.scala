@@ -2,7 +2,7 @@ package automata
 
 import org.scalatest.{FlatSpec, Matchers}
 
-import scalaz.Alpha.A
+import scalaz.Alpha.{A, B}
 
 class LexerAutomataSpec extends FlatSpec with Matchers {
   "Automata" should "have starting state" in {
@@ -33,12 +33,13 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
   }
   it should "transition given matching charachter" in {
     val automata = LexerAutomata.translate("start", "A", Match(Symbol.Char(A)))
+      .translate("start", "B", Match(Symbol.Char(B)))
       .translate("start", "end")
       .stateless("start")
 
-    val next = automata << Symbol.Char(A)
+    val next = automata << Symbol.Char(B)
 
-    next.state shouldBe "A"
+    next.state shouldBe "B"
   }
 
   "FailedAutomata" should "fail to accept new symbols" in {
