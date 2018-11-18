@@ -65,7 +65,7 @@ case class FailedAutomata[M] private[automata](override val state: String,
 }
 
 
-case class AutomataBuilder[M](transitions: Map[String, List[TransitionDestination[M]]] = Map.empty[String, List[TransitionDestination[M]]],
+case class AutomataBuilder[M](transitions: Map[String, List[TransitionDestination[M]]] = AutomataBuilder.emptyTransitions,
                            errorStates: List[(String, String)] = Nil) {
   def translate(from: String, to: String, condition: Condition[M]): AutomataBuilder[M] =
     AutomataBuilder[M](transitions.addBinding(from, to -> condition))
@@ -78,4 +78,8 @@ case class AutomataBuilder[M](transitions: Map[String, List[TransitionDestinatio
 
   def start(initialState: String, initialMemory: M): LexerAutomata[M] =
     RunningAutomata[M](initialState, transitions mapValues { _.sortBy(_.condition)(Condition.ordering) }, errorStates.toMap, initialMemory)
+}
+
+object AutomataBuilder {
+  val emptyTransitions = Map.empty[String, List[TransitionDestination[Any]]]
 }
