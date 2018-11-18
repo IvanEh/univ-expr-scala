@@ -24,7 +24,7 @@ sealed abstract class LexerAutomata[M] {
 }
 
 case class RunningAutomata[M] private[automata](override val state: String,
-                            transitions: Map[String, List[(String, Condition[M])]],
+                            transitions: Map[String, List[TransitionDestination[M]]],
                             errors: Map[String, String],
                             memory: M) extends LexerAutomata[M] {
 
@@ -34,7 +34,7 @@ case class RunningAutomata[M] private[automata](override val state: String,
     val transition = findTransitionFor(symbol)
 
     transition match {
-      case Some((nextState, _)) =>
+      case Some(TransitionDestination(nextState, _)) =>
         errors.get(nextState) match {
           case Some(errorMessage) => FailedAutomata(nextState, errorMessage)
           case None => RunningAutomata(nextState, transitions, errors, memory)
@@ -46,7 +46,7 @@ case class RunningAutomata[M] private[automata](override val state: String,
   private def findTransitionFor(symbol: Symbol) = {
     val transition =
       for (stateTransitions <- transitions.get(state).toStream)
-        yield stateTransitions find { _._2 accepts(symbol, memory, "") }
+        yield stateTransitions find { _.condition accepts (symbol, memory, "") }
 
     transition.head
   }
@@ -65,17 +65,17 @@ case class FailedAutomata[M] private[automata](override val state: String,
 }
 
 
-case class AutomataBuilder[M](transitions: Map[String, List[(String, Condition[M])]] = Map.empty[String, List[(String, Condition[M])]],
+case class AutomataBuilder[M](transitions: Map[String, List[TransitionDestination[M]]] = Map.empty[String, List[TransitionDestination[M]]],
                            errorStates: List[(String, String)] = Nil) {
   def translate(from: String, to: String, condition: Condition[M]): AutomataBuilder[M] =
-    AutomataBuilder[M](transitions.addBinding(from, (to, condition)))
+    AutomataBuilder[M](transitions.addBinding(from, to -> condition))
 
   def describeError(state: String, errorMessage: String): AutomataBuilder[M] = AutomataBuilder[M](transitions,
      (state, errorMessage) :: errorStates )
 
   def translate(from: String, to: String): AutomataBuilder[M] =
-    AutomataBuilder[M](transitions.addBinding(from, (to, Else)), errorStates)
+    AutomataBuilder[M](transitions.addBinding(from, to -> Else), errorStates)
 
   def start(initialState: String, initialMemory: M): LexerAutomata[M] =
-    RunningAutomata[M](initialState, transitions mapValues { _.sortBy(_._2)(Condition.ordering) }, errorStates.toMap, initialMemory)
+    RunningAutomata[M](initialState, transitions mapValues { _.sortBy(_.condition)(Condition.ordering) }, errorStates.toMap, initialMemory)
 }

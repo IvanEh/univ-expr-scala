@@ -15,7 +15,7 @@ case class Match[-M](char: Symbol) extends Condition[M] {
 }
 
 
-object Else extends Condition[Any] {
+private[automata] object Else extends Condition[Any] {
   override def accepts(char: Symbol, memory: Any, accumulator: String): Boolean = true
   override protected val priority: Int = 1
 }
