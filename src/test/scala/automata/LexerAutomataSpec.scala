@@ -5,7 +5,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import scalaz.Alpha.{A, B}
 
 class LexerAutomataSpec extends FlatSpec with Matchers {
-  "Automata" should "have starting state" in {
+  "Stateless Automata" should "have starting state" in {
     val automata = LexerAutomata.start("start")
 
     automata.state shouldBe "start"
@@ -31,6 +31,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
     next.error shouldBe Some("error message")
     next.isInstanceOf[FailedAutomata[_]] shouldBe true
   }
+
   it should "transition given matching charachter" in {
     val automata = LexerAutomata.translate("start", "A", Match(Symbol.Char(A)))
       .translate("start", "B", Match(Symbol.Char(B)))
@@ -42,8 +43,37 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
     next.state shouldBe "B"
   }
 
+  it should "accumulate if requested" in {
+    val automata = LexerAutomata.translate[Unit]("start", "end", Accumulate)
+      .stateless("start")
+
+    val next = automata << Symbol.Char(A)
+
+    next.accumulator shouldBe "a"
+  }
+
+  "Stateful Automata" should "do transition given memory check passes" in {
+    val automata = LexerAutomata.translate[Boolean]("start", "condPassed", ExprCondition[Boolean]((_, m, _) => m))
+      .translate("start", "notPassed")
+      .start("start", true)
+
+    val next = automata << Symbol.Char(A)
+
+    next.state shouldBe "condPassed"
+  }
+
+  it should "skip transition given memory check failes" in {
+    val automata = LexerAutomata.translate[Boolean]("start", "condPassed", ExprCondition[Boolean]((_, m, _) => m))
+      .translate("start", "notPassed")
+      .start("start", false)
+
+    val next = automata << Symbol.Char(A)
+
+    next.state shouldBe "notPassed"
+  }
+
   "FailedAutomata" should "fail to accept new symbols" in {
-    val automata = FailedAutomata("error", "message")
+    val automata = FailedAutomata("error", "message", "")
 
     assertThrows[IllegalStateException] {
       automata << Symbol.None
