@@ -30,6 +30,8 @@ sealed abstract class LexerAutomata[M] {
   def error: Option[String]
 
   def <<(symbol: Symbol): LexerAutomata[M]
+  def terminate(): LexerAutomata[M] = this << Symbol.Terminal
+  def idle(): LexerAutomata[M] = this << Symbol.None // TODO: do idle() when needed automatically
 
   final def isFailed: Boolean = error.isDefined
 }
