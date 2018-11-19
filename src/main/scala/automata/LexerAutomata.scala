@@ -3,13 +3,17 @@ package automata
 import automata.MultiMap._
 
 object LexerAutomata {
+
   import AutomataBuilder.AnyAutomataBuilder
 
   def translate[M](from: String, to: String, condition: Condition[M]): AutomataBuilder[M] = AutomataBuilder[M]()
     .translate(from, to, condition)
 
-  def translate[M](from: String, to: String, action: Action): AutomataBuilder[M] = AutomataBuilder[M]()
+  def translate[M](from: String, to: String, action: Action[M]): AutomataBuilder[M] = AutomataBuilder[M]()
     .translate(from, to, action)
+
+  def translate[M](from: String, to: String, condition: Condition[M], action: Action[M]): AutomataBuilder[M]
+    = AutomataBuilder[M]().translate(from, to, condition, action)
 
   def translate[M](from: String, to: String): AutomataBuilder[M] = AutomataBuilder[M]()
     .translate(from, to)
@@ -45,14 +49,16 @@ case class RunningAutomata[M] private[automata](override val state: String,
       case Some(TransitionDestination(nextState, action, _)) =>
         errors.get(nextState) match {
           case Some(errorMessage) => FailedAutomata(nextState, errorMessage)
-          case None => this updated (nextState, memory, computeAccumulator(action, symbol))
+          case None => this updated (nextState = nextState,
+            nextMemory = action.nextMemory(memory).asInstanceOf[M],
+            nextAccumulator = computeAccumulator(action.asInstanceOf[Action[M]], symbol))
         }
       case _ => throw new IllegalStateException(s"Exhaustive state transition is not declared for $state")
     }
   }
 
-  private def computeAccumulator(action: Action, symbol: Symbol): String = symbol match {
-    case Symbol.Char(char) if action == Accumulate => accumulator + char
+  private def computeAccumulator(action: Action[M], symbol: Symbol): String = symbol match {
+    case Symbol.Char(char) if action.accumulate => accumulator + char
     case _ => accumulator
   }
 
@@ -81,11 +87,15 @@ case class FailedAutomata[M] private[automata](override val state: String,
 case class AutomataBuilder[-M](transitions: Map[String, List[TransitionDestination[M]]] = AutomataBuilder.emptyTransitions,
                            errorStates: List[(String, String)] = Nil) {
 
+
   def translate[A <: M](from: String, to: String, condition: Condition[A]): AutomataBuilder[A] =
     AutomataBuilder[A](transitions.addBinding(from, condition -> (to, NoAction)))
 
-  def translate(from: String, to: String, action: Action): AutomataBuilder[M] =
+  def translate[A <: M](from: String, to: String, action: Action[A]): AutomataBuilder[A] =
     AutomataBuilder(transitions.addBinding(from, Else -> (to, action)))
+
+  def translate[A <: M](from: String, to: String, condition: Condition[A], action: Action[A]): AutomataBuilder[A] =
+    AutomataBuilder(transitions.addBinding(from, condition -> (to, action)))
 
   def describeError(state: String, errorMessage: String): AutomataBuilder[M] = AutomataBuilder[M](transitions,
      (state, errorMessage) :: errorStates )

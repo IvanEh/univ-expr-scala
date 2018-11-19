@@ -73,6 +73,20 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
     next.state shouldBe "notPassed"
   }
 
+  it should "change memory, accumulate and push token when requsted and matching char" in {
+    val automata = LexerAutomata.translate[Boolean]("start", "passed", Match(Symbol.Char(A)), Action(true, true, { b: Boolean => !b }))
+      .start("start", true)
+    val next = automata << Symbol.Char(A)
+
+    next.state shouldBe "passed"
+    next shouldBe a [RunningAutomata[_]]
+
+    val nextRunning = next.asInstanceOf[RunningAutomata[_]]
+
+    nextRunning.memory shouldBe false
+    nextRunning.accumulator shouldBe "a"
+  }
+
   "FailedAutomata" should "fail to accept new symbols" in {
     val automata = FailedAutomata("error", "message")
 
