@@ -89,7 +89,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
   }
 
   it should "accumulate without pushing token when requested" in {
-    val automata = LexerAutomata.translate[Unit]("start", "passed", Match(Symbol.Char(A)), Action(false, true, identity[Unit]))
+    val automata = LexerAutomata.translate[Unit]("start", "passed", Match(Symbol.Char(A)), Accumulate)
         .stateless("start")
 
     val next = automata << Symbol.Char(A)
@@ -102,7 +102,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
   }
 
   it should "accumuluate several symbols" in {
-    val automata = LexerAutomata.translate[Unit]("start", "start", Action(false, true, identity[Unit]))
+    val automata = LexerAutomata.translate[Unit]("start", "start", Accumulate)
       .stateless("start")
 
     val next = automata << Symbol.Char(A) << Symbol.Char(B)
@@ -115,9 +115,9 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
   }
 
   it should "reset token when in pushed token state action" in {
-    val automata = LexerAutomata.translate[Unit]("start", "accumulate", Action(false, true, identity[Unit]))
-        .translate("accumulate", "token", Action(true, false, identity[Unit]))
-        .translate("token", "reset", Action(false, false, identity[Unit]))
+    val automata = LexerAutomata.translate[Unit]("start", "accumulate", Accumulate)
+        .translate("accumulate", "token", PushToken)
+        .translate("token", "reset")
         .stateless("start")
 
     val step1 = automata << Symbol.Char(A) << Symbol.Char(B)
