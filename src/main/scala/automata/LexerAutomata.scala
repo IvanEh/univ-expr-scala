@@ -40,7 +40,8 @@ case class RunningAutomata[M] private[automata](override val state: String,
                             transitions: Map[String, List[TransitionDestination[M]]],
                             errors: Map[String, String],
                             memory: M,
-                            accumulator: String) extends LexerAutomata[M] {
+                            accumulator: String,
+                            token: Option[String]) extends LexerAutomata[M] {
 
   override def error: Option[String] = None
 
@@ -53,16 +54,23 @@ case class RunningAutomata[M] private[automata](override val state: String,
           case Some(errorMessage) => FailedAutomata(nextState, errorMessage)
           case None => this updated (nextState = nextState,
             nextMemory = action.nextMemory(memory).asInstanceOf[M],
-            nextAccumulator = computeAccumulator(action.asInstanceOf[Action[M]], symbol))
+            nextToken = computeToken(action, symbol),
+            nextAccumulator = computeAccumulator(action, symbol))
         }
       case _ => throw new IllegalStateException(s"Exhaustive state transition is not declared for $state")
     }
   }
 
-  private def computeAccumulator(action: Action[M], symbol: Symbol): String = symbol match {
+  private def computeAccumulator(action: Action[M], symbol: Symbol): String
+    = if (action.pushToken) "" else computePartialAccumulator(action, symbol)
+
+  private def computePartialAccumulator(action: Action[M], symbol: Symbol): String = symbol match {
     case Symbol.Char(char) if action.accumulate => accumulator + char
     case _ => accumulator
   }
+
+  private def computeToken(action: Action[M], symbol: Symbol): Option[String]
+    = if (action.pushToken) Some(computePartialAccumulator(action, symbol)) else None
 
   private def findTransitionFor(symbol: Symbol) = {
     val transition =
@@ -72,7 +80,9 @@ case class RunningAutomata[M] private[automata](override val state: String,
     transition.head
   }
 
-  protected final def updated(nextState: String, nextMemory: M, nextAccumulator: String): RunningAutomata[M] = RunningAutomata(nextState, transitions, errors, nextMemory, nextAccumulator)
+  protected final
+  def updated(nextState: String, nextMemory: M, nextAccumulator: String, nextToken: Option[String]): RunningAutomata[M]
+    = RunningAutomata(nextState, transitions, errors, nextMemory, nextAccumulator, nextToken)
 }
 
 case class FailedAutomata[M] private[automata](override val state: String,
@@ -106,7 +116,7 @@ case class AutomataBuilder[-M](transitions: Map[String, List[TransitionDestinati
     AutomataBuilder[M](transitions.addBinding(from, Else -> (to, NoAction)), errorStates)
 
   def start[Z <: M](initialState: String, initialMemory: Z): LexerAutomata[Z] =
-    RunningAutomata[Z](initialState, transitions mapValues { _.sortBy(_.condition)(Condition.ordering) }, errorStates.toMap, initialMemory, "")
+    RunningAutomata[Z](initialState, transitions mapValues { _.sortBy(_.condition)(Condition.ordering) }, errorStates.toMap, initialMemory, "", None)
 }
 
 object AutomataBuilder {

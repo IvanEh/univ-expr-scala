@@ -2,7 +2,7 @@ package automata
 
 import org.scalatest.{FlatSpec, Matchers}
 
-import scalaz.Alpha.{A, B}
+import scalaz.Alpha.{A, B, C}
 
 class LexerAutomataSpec extends FlatSpec with Matchers {
   "Stateless Automata" should "have starting state" in {
@@ -73,7 +73,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
     next.state shouldBe "notPassed"
   }
 
-  it should "change memory, accumulate and push token when requsted and matching char" in {
+  it should "change memory, push token when requsted and matching char" in {
     val automata = LexerAutomata.translate[Boolean]("start", "passed", Match(Symbol.Char(A)), Action(true, true, { b: Boolean => !b }))
       .start("start", true)
     val next = automata << Symbol.Char(A)
@@ -84,7 +84,47 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
     val nextRunning = next.asInstanceOf[RunningAutomata[_]]
 
     nextRunning.memory shouldBe false
+    nextRunning.accumulator shouldBe ""
+    nextRunning.token shouldBe Some("a")
+  }
+
+  it should "accumulate without pushing token when requested" in {
+    val automata = LexerAutomata.translate[Unit]("start", "passed", Match(Symbol.Char(A)), Action(false, true, identity[Unit]))
+        .stateless("start")
+
+    val next = automata << Symbol.Char(A)
+
+    next shouldBe a [RunningAutomata[_]]
+    val nextRunning = next.asInstanceOf[RunningAutomata[_]]
+
     nextRunning.accumulator shouldBe "a"
+    nextRunning.token shouldBe None
+  }
+
+  it should "accumuluate several symbols" in {
+    val automata = LexerAutomata.translate[Unit]("start", "start", Action(false, true, identity[Unit]))
+      .stateless("start")
+
+    val next = automata << Symbol.Char(A) << Symbol.Char(B)
+
+    next shouldBe a [RunningAutomata[_]]
+    val nextRunning = next.asInstanceOf[RunningAutomata[_]]
+
+    nextRunning.accumulator shouldBe "ab"
+    nextRunning.token shouldBe None
+  }
+
+  it should "reset token when in pushed token state action" in {
+    val automata = LexerAutomata.translate[Unit]("start", "accumulate", Action(false, true, identity[Unit]))
+        .translate("accumulate", "token", Action(true, false, identity[Unit]))
+        .translate("token", "reset", Action(false, false, identity[Unit]))
+        .stateless("start")
+
+    val step1 = automata << Symbol.Char(A) << Symbol.Char(B)
+    step1.asInstanceOf[RunningAutomata[_]].token shouldBe Some("a")
+
+    val step2 = automata << Symbol.Char(C)
+    step2.asInstanceOf[RunningAutomata[_]].token shouldBe None
   }
 
   "FailedAutomata" should "fail to accept new symbols" in {
