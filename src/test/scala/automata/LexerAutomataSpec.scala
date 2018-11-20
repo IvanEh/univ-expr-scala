@@ -2,7 +2,7 @@ package automata
 
 import org.scalatest.{FlatSpec, Matchers}
 
-import scalaz.Alpha.{A, B, C}
+import scalaz.Alpha.C
 
 class LexerAutomataSpec extends FlatSpec with Matchers {
   "Stateless Automata" should "have starting state" in {
@@ -33,12 +33,12 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
   }
 
   it should "transition given matching charachter" in {
-    val automata = LexerAutomata.translate("start", "A", Match(Symbol.Char(A)))
-      .translate("start", "B", Match(Symbol.Char(B)))
+    val automata = LexerAutomata.translate("start", "A", Match('a'))
+      .translate("start", "B", Match('b'))
       .translate("start", "end")
       .stateless("start")
 
-    val next = automata << Symbol.Char(B)
+    val next = automata << 'b'
 
     next.state shouldBe "B"
   }
@@ -47,7 +47,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
     val automata = LexerAutomata.translate[Unit]("start", "end", Accumulate)
       .stateless("start")
 
-    val next = automata << Symbol.Char(A)
+    val next = automata << 'a'
 
     next.isInstanceOf[RunningAutomata[Unit]] shouldBe true
     next.asInstanceOf[RunningAutomata[Unit]].accumulator shouldBe "a"
@@ -58,7 +58,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
       .translate("start", "notPassed")
       .start("start", true)
 
-    val next = automata << Symbol.Char(A)
+    val next = automata << 'a'
 
     next.state shouldBe "condPassed"
   }
@@ -68,15 +68,15 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
       .translate("start", "notPassed")
       .start("start", false)
 
-    val next = automata << Symbol.Char(A)
+    val next = automata << 'a'
 
     next.state shouldBe "notPassed"
   }
 
   it should "change memory, push token when requsted and matching char" in {
-    val automata = LexerAutomata.translate[Boolean]("start", "passed", Match(Symbol.Char(A)), Action(true, true, { b: Boolean => !b }))
+    val automata = LexerAutomata.translate[Boolean]("start", "passed", Match('a'), Action(true, true, { b: Boolean => !b }))
       .start("start", true)
-    val next = automata << Symbol.Char(A)
+    val next = automata << 'a'
 
     next.state shouldBe "passed"
     next shouldBe a [RunningAutomata[_]]
@@ -89,10 +89,10 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
   }
 
   it should "accumulate without pushing token when requested" in {
-    val automata = LexerAutomata.translate[Unit]("start", "passed", Match(Symbol.Char(A)), Accumulate)
+    val automata = LexerAutomata.translate[Unit]("start", "passed", Match('a'), Accumulate)
         .stateless("start")
 
-    val next = automata << Symbol.Char(A)
+    val next = automata << 'a'
 
     next shouldBe a [RunningAutomata[_]]
     val nextRunning = next.asInstanceOf[RunningAutomata[_]]
@@ -105,7 +105,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
     val automata = LexerAutomata.translate[Unit]("start", "start", Accumulate)
       .stateless("start")
 
-    val next = automata << Symbol.Char(A) << Symbol.Char(B)
+    val next = automata << 'a' << 'b'
 
     next shouldBe a [RunningAutomata[_]]
     val nextRunning = next.asInstanceOf[RunningAutomata[_]]
@@ -120,7 +120,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
         .translate("token", "reset")
         .stateless("start")
 
-    val step1 = automata << Symbol.Char(A) << Symbol.Char(B)
+    val step1 = automata << 'a' << 'b'
     step1.asInstanceOf[RunningAutomata[_]].token shouldBe Some("a")
 
     val step2 = automata << Symbol.Char(C)
