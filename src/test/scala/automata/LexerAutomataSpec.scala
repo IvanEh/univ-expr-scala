@@ -49,8 +49,7 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
 
     val next = automata << 'a'
 
-    next.isInstanceOf[RunningAutomata[Unit]] shouldBe true
-    next.asInstanceOf[RunningAutomata[Unit]].accumulator shouldBe "a"
+    next.accumulator shouldBe "a"
   }
 
   "Stateful Automata" should "do transition given memory check passes" in {
@@ -95,10 +94,8 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
     val next = automata << 'a'
 
     next shouldBe a [RunningAutomata[_]]
-    val nextRunning = next.asInstanceOf[RunningAutomata[_]]
-
-    nextRunning.accumulator shouldBe "a"
-    nextRunning.token shouldBe None
+    next.accumulator shouldBe "a"
+    next.token shouldBe None
   }
 
   it should "accumuluate several symbols" in {
@@ -108,10 +105,9 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
     val next = automata << 'a' << 'b'
 
     next shouldBe a [RunningAutomata[_]]
-    val nextRunning = next.asInstanceOf[RunningAutomata[_]]
 
-    nextRunning.accumulator shouldBe "ab"
-    nextRunning.token shouldBe None
+    next.accumulator shouldBe "ab"
+    next.token shouldBe None
   }
 
   it should "reset token when in pushed token state action" in {
@@ -121,10 +117,10 @@ class LexerAutomataSpec extends FlatSpec with Matchers {
         .stateless("start")
 
     val step1 = automata << 'a' << 'b'
-    step1.asInstanceOf[RunningAutomata[_]].token shouldBe Some("a")
+    step1.token shouldBe Some("a")
 
     val step2 = automata << Symbol.Char(C)
-    step2.asInstanceOf[RunningAutomata[_]].token shouldBe None
+    step2.token shouldBe None
   }
 
   "FailedAutomata" should "fail to accept new symbols" in {

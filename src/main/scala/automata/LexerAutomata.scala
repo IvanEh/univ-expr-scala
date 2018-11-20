@@ -27,7 +27,9 @@ object LexerAutomata {
 
 sealed abstract class LexerAutomata[M] {
   val state: String
-  def error: Option[String]
+  val accumulator: String
+  val token: Option[String]
+  val error: Option[String]
 
   def <<(symbol: Symbol): LexerAutomata[M]
   def terminate(): LexerAutomata[M] = this << Symbol.Terminal
@@ -40,10 +42,10 @@ case class RunningAutomata[M] private[automata](override val state: String,
                             transitions: Map[String, List[TransitionDestination[M]]],
                             errors: Map[String, String],
                             memory: M,
-                            accumulator: String,
-                            token: Option[String]) extends LexerAutomata[M] {
+                            override val accumulator: String,
+                            override val token: Option[String]) extends LexerAutomata[M] {
 
-  override def error: Option[String] = None
+  override val error: Option[String] = None
 
   def <<(symbol: Symbol): LexerAutomata[M] = {
     val transition = findTransitionFor(symbol)
@@ -88,7 +90,9 @@ case class RunningAutomata[M] private[automata](override val state: String,
 case class FailedAutomata[M] private[automata](override val state: String,
                                        errorMessage: String) extends LexerAutomata[M] {
 
-  override def error: Option[String] = Some(errorMessage)
+  override val accumulator: String = ""
+  override val token: Option[String] = None
+  override val error: Option[String] = Some(errorMessage)
 
   override def <<(symbol: Symbol): LexerAutomata[M] =
     throw new IllegalStateException("Automata cannot accept any new symbol in failed state")
