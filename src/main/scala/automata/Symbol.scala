@@ -7,7 +7,7 @@ object Symbol {
   object Terminal extends Symbol
   case class Char(char: scala.Char) extends Symbol
 
-  implicit def char2CharSymbol(char: scala.Char): Symbol.Char = Symbol.Char(char)
+  implicit def char2CharSymbol(char: scala.Char): Symbol = if (char == '\0') Symbol.Terminal else Symbol.Char(char)
 }
 
 
