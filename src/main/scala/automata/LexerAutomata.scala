@@ -28,7 +28,7 @@ object LexerAutomata {
 sealed abstract class LexerAutomata[M] {
   val state: String
   val accumulator: String
-  val token: Option[String]
+  val token: Option[Token]
   val error: Option[String]
 
   def <<(symbol: Symbol): LexerAutomata[M]
@@ -43,7 +43,7 @@ case class RunningAutomata[M] private[automata](override val state: String,
                             errors: Map[String, String],
                             memory: M,
                             override val accumulator: String,
-                            override val token: Option[String]) extends LexerAutomata[M] {
+                            override val token: Option[Token]) extends LexerAutomata[M] {
 
   override val error: Option[String] = None
 
@@ -63,17 +63,20 @@ case class RunningAutomata[M] private[automata](override val state: String,
     }
   }
 
-  private def computeAccumulator(action: Action[M], symbol: Symbol): String
-    = if (action.pushToken) computePartialAccumulator(action, symbol, "")
-      else computePartialAccumulator(action, symbol, accumulator)
+  private def computeAccumulator(action: Action[M], symbol: Symbol): String = action.pushToken match {
+    case Some(_) => computePartialAccumulator(action, symbol, "")
+    case None => computePartialAccumulator(action, symbol, accumulator)
+  }
 
   private def computePartialAccumulator(action: Action[M], symbol: Symbol, accumulator: String): String = symbol match {
     case Symbol.Char(char) if action.accumulate => accumulator + char
     case _ => accumulator
   }
 
-  private def computeToken(action: Action[M], symbol: Symbol): Option[String]
-    = if (action.pushToken) Some(accumulator) else None
+  private def computeToken(action: Action[M], symbol: Symbol): Option[Token] = action.pushToken match {
+    case Some(marker) => Some (Token(accumulator, marker))
+    case None => None
+  }
 
   private def findTransitionFor(symbol: Symbol) = {
     val transition =
@@ -87,7 +90,7 @@ case class RunningAutomata[M] private[automata](override val state: String,
   }
 
   protected final
-  def updated(nextState: String, nextMemory: M, nextAccumulator: String, nextToken: Option[String]): RunningAutomata[M]
+  def updated(nextState: String, nextMemory: M, nextAccumulator: String, nextToken: Option[Token]): RunningAutomata[M]
     = RunningAutomata(nextState, transitions, errors, nextMemory, nextAccumulator, nextToken)
 }
 
@@ -95,7 +98,7 @@ case class FailedAutomata[M] private[automata](override val state: String,
                                        errorMessage: String) extends LexerAutomata[M] {
 
   override val accumulator: String = ""
-  override val token: Option[String] = None
+  override val token: Option[Token] = None
   override val error: Option[String] = Some(errorMessage)
 
   override def <<(symbol: Symbol): LexerAutomata[M] =

@@ -1,6 +1,6 @@
 package app
 
-import automata.Action.mutateMemory
+import automata.Action._
 import automata.Condition.{whenMemory, _}
 import automata._
 import com.typesafe.scalalogging.StrictLogging
@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.StrictLogging
 import scalaz.\/
 
 class SimpleExpressionParser(expression: String) extends StrictLogging {
-  def doLexing(): LexerError \/ List[String] = {
+  def doLexing(): LexerError \/ List[Token] = {
     val result = Lexer.parse(expression, automata)
 
     logger.debug(s"Result of parsing $expression is $result")
@@ -16,6 +16,7 @@ class SimpleExpressionParser(expression: String) extends StrictLogging {
   }
 
   import app.ExpressionMemory._
+  import app.TokenType._
 
   private val whenOperator = anyChar('-', '+', '*', '/')
   private val whenSpace = Match(' ')
@@ -34,35 +35,35 @@ class SimpleExpressionParser(expression: String) extends StrictLogging {
     .translate("readExpression", "errorUnbalanced", whenBalancedBrackets && whenOuterOperand && whenCloseBracket, Accumulate)
     .translate("readExpression", "errorInvalidChar")
 
-    .translate("pushOpenBracket", "readExpression", Match(Symbol.None), PushToken + increaseBrackets + setBoundaryOperand)
+    .translate("pushOpenBracket", "readExpression", Match(Symbol.None), pushOpenBracket + increaseBrackets + setBoundaryOperand)
 
-    .translate("pushCloseBracket", "waitForOperator", Match(Symbol.None) && whenPositiveBrackets, PushToken + decreaseBrackets)
+    .translate("pushCloseBracket", "waitForOperator", Match(Symbol.None) && whenPositiveBrackets, pushCloseBracket + decreaseBrackets)
     .translate("pushCloseBracket", "errorUnbalanced", Match(Symbol.None) && whenBalancedBrackets)
 
     .translate("readNumber", "readNumber", whenDigit, Accumulate)
     .translate("readNumber", "readDecimal", Match('.'), Accumulate)
-    .translate("readNumber", "pushOperator", whenOperator, Accumulate + PushToken) // Mutual 1
-    .translate("readNumber", "waitForOperator", whenSpace, PushToken)   // Half-Mutual
-    .translate("readNumber", "pushCloseBracket", whenCloseBracket && whenPositiveBrackets, PushToken + Accumulate) // Mutual 2
-    .translate("readNumber", "success", whenFinishing, PushToken) // Mutual 3
+    .translate("readNumber", "pushOperator", whenOperator, Accumulate + pushNumber) // Mutual 1
+    .translate("readNumber", "waitForOperator", whenSpace, pushNumber)   // Half-Mutual
+    .translate("readNumber", "pushCloseBracket", whenCloseBracket && whenPositiveBrackets, pushNumber + Accumulate) // Mutual 2
+    .translate("readNumber", "success", whenFinishing, pushNumber) // Mutual 3
     .translate("readNumber", "errorCharAtNumber", whenAlpha)
     .translate("readNumber", "errorInvalidChar")
 
     .translate("readDecimal", "readDecimal", whenDigit, Accumulate)
-    .translate("readDecimal", "pushOperator", whenOperator, Accumulate + PushToken) // Mutual 1
-    .translate("readDecimal", "waitForOperator", whenSpace, PushToken) // Half-Mutual
-    .translate("readDecimal", "pushCloseBracket", whenCloseBracket && whenPositiveBrackets, PushToken + Accumulate) // Mutual 2
-    .translate("readDecimal", "success", whenFinishing, PushToken) // Mutual 3
+    .translate("readDecimal", "pushOperator", whenOperator, Accumulate + pushDecimal) // Mutual 1
+    .translate("readDecimal", "waitForOperator", whenSpace, pushDecimal) // Half-Mutual
+    .translate("readDecimal", "pushCloseBracket", whenCloseBracket && whenPositiveBrackets, pushDecimal + Accumulate) // Mutual 2
+    .translate("readDecimal", "success", whenFinishing, pushDecimal) // Mutual 3
     .translate("readDecimal", "errorDecimalPoint", Match('.'))
     .translate("readDecimal", "errorCharAtNumber", whenAlpha)
     .translate("readDecimal", "errorInvalidChar")
 
     .translate("readVarOrFunc", "readVarOrFunc", whenDigit || whenAlpha, Accumulate)
-    .translate("readVarOrFunc", "waitForFuncOrOperator", whenSpace, PushToken)
-    .translate("readVarOrFunc", "pushOperator", whenOperator, Accumulate + PushToken) // Mutual 1
-    .translate("readVarOrFunc", "pushOpenBracket", whenOpenBracket, PushToken + Accumulate)
-    .translate("readVarOrFunc", "pushCloseBracket", whenCloseBracket && whenPositiveBrackets, PushToken + Accumulate) // Mutual 2
-    .translate("readVarOrFunc", "success", whenFinishing, PushToken) // Mutual 3
+    .translate("readVarOrFunc", "waitForFuncOrOperator", whenSpace, pushVariable)
+    .translate("readVarOrFunc", "pushOperator", whenOperator, Accumulate + pushVariable) // Mutual 1
+    .translate("readVarOrFunc", "pushOpenBracket", whenOpenBracket, pushFunction + Accumulate)
+    .translate("readVarOrFunc", "pushCloseBracket", whenCloseBracket && whenPositiveBrackets, pushVariable + Accumulate) // Mutual 2
+    .translate("readVarOrFunc", "success", whenFinishing, pushVariable) // Mutual 3
 
     .translate("waitForFuncOrOperator", "pushOperator", whenOperator, Accumulate)
     .translate("waitForFuncOrOperator", "waitForFuncOrOperator", whenSpace)
@@ -77,7 +78,7 @@ class SimpleExpressionParser(expression: String) extends StrictLogging {
     .translate("waitForOperator", "pushCloseBracket", whenCloseBracket, Accumulate)
     .translate("waitForOperator", "success", whenFinishing)
     .translate("waitForOperator", "errorOperatorExpected")
-    .translate("pushOperator", "readExpression", Match(Symbol.None), PushToken + setInnerOperand)
+    .translate("pushOperator", "readExpression", Match(Symbol.None), pushOperator + setInnerOperand)
 
     .describeError("errorDecimalPoint", "Two decimal points")
     .describeError("errorOperatorAtExpression", "Expected number or variable but got operator")
@@ -102,8 +103,17 @@ private case class ExpressionMemory(boundaryOperand: Boolean = true, openBracket
   def decreaseBrackets(): ExpressionMemory = ExpressionMemory(boundaryOperand, openBrackets - 1)
 }
 
-object ValueType extends Enumeration {
-  val Number, Variable, Function, Decimal = Value
+object TokenType extends Enumeration {
+  val Number, Variable, Function, Decimal, OpenBracket, CloseBracket, Operator = Val()
+  val pushNumber = pushToken(Number)
+  val pushVariable = pushToken(Variable)
+  val pushFunction = pushToken(Function)
+  val pushDecimal = pushToken(Decimal)
+  val pushOpenBracket = pushToken(OpenBracket)
+  val pushCloseBracket = pushToken(CloseBracket)
+  val pushOperator = pushToken(Operator)
+
+  protected case class Val() extends super.Val with Marker
 }
 
 private object ExpressionMemory {

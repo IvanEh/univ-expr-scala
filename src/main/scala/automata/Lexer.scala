@@ -7,9 +7,9 @@ import scalaz.{-\/, \/, \/-}
 
 object Lexer extends StrictLogging {
 
-  def parse[M](expression: String, automata: LexerAutomata[M]): LexerError \/ List[String] = {
+  def parse[M](expression: String, automata: LexerAutomata[M]): LexerError \/ List[Token] = {
     var idx = 0
-    val tokens = List.newBuilder[String]
+    val tokens = List.newBuilder[Token]
     val symbols = expression + '\0'
 
     var curr = automata
@@ -47,7 +47,7 @@ object Lexer extends StrictLogging {
       logger.debug("->> " + current.state + " " + (current match { case r: RunningAutomata[M] => r.memory; case _ => ""}))
   }
 
-  private def appendTokenIfExists[M](tokens: mutable.Builder[String, List[String]], curr: LexerAutomata[M]) = {
+  private def appendTokenIfExists[M](tokens: mutable.Builder[Token, List[Token]], curr: LexerAutomata[M]) = {
     if (curr.token.isDefined)
       tokens += curr.token.get
   }

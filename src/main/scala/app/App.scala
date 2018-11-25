@@ -1,6 +1,6 @@
 package app
 
-import automata.LexerError
+import automata.{LexerError, Token}
 
 import scala.io.StdIn
 import scalaz.{-\/, \/-}
@@ -24,7 +24,7 @@ object App {
     println("^".padTo(pos + 1, " ").mkString.reverse + Console.RED + s" - $error" + Console.BLACK)
   }
 
-  private def printTokens(tokens: List[String]): Unit = {
+  private def printTokens(tokens: List[Token]): Unit = {
     print(Console.GREEN)
     println("Expression parsed successfully")
     print(Console.BLACK)
