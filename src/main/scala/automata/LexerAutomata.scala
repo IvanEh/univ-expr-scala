@@ -64,22 +64,26 @@ case class RunningAutomata[M] private[automata](override val state: String,
   }
 
   private def computeAccumulator(action: Action[M], symbol: Symbol): String
-    = if (action.pushToken) "" else computePartialAccumulator(action, symbol)
+    = if (action.pushToken) computePartialAccumulator(action, symbol, "")
+      else computePartialAccumulator(action, symbol, accumulator)
 
-  private def computePartialAccumulator(action: Action[M], symbol: Symbol): String = symbol match {
+  private def computePartialAccumulator(action: Action[M], symbol: Symbol, accumulator: String): String = symbol match {
     case Symbol.Char(char) if action.accumulate => accumulator + char
     case _ => accumulator
   }
 
   private def computeToken(action: Action[M], symbol: Symbol): Option[String]
-    = if (action.pushToken) Some(computePartialAccumulator(action, symbol)) else None
+    = if (action.pushToken) Some(accumulator) else None
 
   private def findTransitionFor(symbol: Symbol) = {
     val transition =
       for (stateTransitions <- transitions.get(state).toStream)
         yield stateTransitions find { _.condition accepts (symbol, memory, "") }
 
-    transition.head
+    transition.headOption getOrElse None match {
+      case None if symbol == Symbol.None => Some(TransitionDestination[M](state, NoAction, Else))
+      case t => t
+    }
   }
 
   protected final
