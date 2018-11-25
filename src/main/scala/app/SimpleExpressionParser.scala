@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.StrictLogging
 import scalaz.\/
 
 class SimpleExpressionParser(expression: String) extends StrictLogging {
-  def doLexing(): String \/ List[String] = {
+  def doLexing(): LexerError \/ List[String] = {
     val result = Lexer.parse(expression, automata)
 
     logger.debug(s"Result of parsing $expression is $result")
@@ -26,36 +26,59 @@ class SimpleExpressionParser(expression: String) extends StrictLogging {
   private val automata = LexerAutomata
     .translate("readExpression", "readExpression", whenSpace)
     .translate("readExpression", "readNumber", whenDigit, Accumulate)
+    .translate("readExpression", "readVarOrFunc", whenAlpha, Accumulate)
     .translate("readExpression", "pushOpenBracket", whenOpenBracket, Accumulate)
     .translate("readExpression", "errorOperatorAtExpression", whenOperator)
     .translate("readExpression", "errorExpectedSecondOperand", whenFinishing) // test
     .translate("readExpression", "errorBoundaryClosingBracket", whenCloseBracket && whenBoundaryOperand)
     .translate("readExpression", "errorUnbalanced", whenBalancedBrackets && whenOuterOperand && whenCloseBracket, Accumulate)
     .translate("readExpression", "errorInvalidChar")
+
     .translate("pushOpenBracket", "readExpression", Match(Symbol.None), PushToken + increaseBrackets + setBoundaryOperand)
+
     .translate("pushCloseBracket", "waitForOperator", Match(Symbol.None) && whenPositiveBrackets, PushToken + decreaseBrackets)
     .translate("pushCloseBracket", "errorUnbalanced", Match(Symbol.None) && whenBalancedBrackets)
+
     .translate("readNumber", "readNumber", whenDigit, Accumulate)
     .translate("readNumber", "readDecimal", Match('.'), Accumulate)
-    .translate("readNumber", "pushOperator", whenOperator, Accumulate + PushToken)
+    .translate("readNumber", "pushOperator", whenOperator, Accumulate + PushToken) // Mutual 1
+    .translate("readNumber", "waitForOperator", whenSpace, PushToken)   // Half-Mutual
+    .translate("readNumber", "pushCloseBracket", whenCloseBracket && whenPositiveBrackets, PushToken + Accumulate) // Mutual 2
+    .translate("readNumber", "success", whenFinishing, PushToken) // Mutual 3
     .translate("readNumber", "errorCharAtNumber", whenAlpha)
-    .translate("readNumber", "waitForOperator", whenSpace, PushToken)
-    .translate("readNumber", "pushCloseBracket", whenCloseBracket && whenPositiveBrackets, PushToken + Accumulate)
-    .translate("readNumber", "success", whenFinishing, PushToken)
     .translate("readNumber", "errorInvalidChar")
+
     .translate("readDecimal", "readDecimal", whenDigit, Accumulate)
+    .translate("readDecimal", "pushOperator", whenOperator, Accumulate + PushToken) // Mutual 1
+    .translate("readDecimal", "waitForOperator", whenSpace, PushToken) // Half-Mutual
+    .translate("readDecimal", "pushCloseBracket", whenCloseBracket && whenPositiveBrackets, PushToken + Accumulate) // Mutual 2
+    .translate("readDecimal", "success", whenFinishing, PushToken) // Mutual 3
     .translate("readDecimal", "errorDecimalPoint", Match('.'))
     .translate("readDecimal", "errorCharAtNumber", whenAlpha)
-    .translate("readDecimal", "success", whenFinishing, PushToken)
-    .translate("readDecimal", "waitForOperator", whenSpace, PushToken)
     .translate("readDecimal", "errorInvalidChar")
+
+    .translate("readVarOrFunc", "readVarOrFunc", whenDigit || whenAlpha, Accumulate)
+    .translate("readVarOrFunc", "waitForFuncOrOperator", whenSpace, PushToken)
+    .translate("readVarOrFunc", "pushOperator", whenOperator, Accumulate + PushToken) // Mutual 1
+    .translate("readVarOrFunc", "pushOpenBracket", whenOpenBracket, PushToken + Accumulate)
+    .translate("readVarOrFunc", "pushCloseBracket", whenCloseBracket && whenPositiveBrackets, PushToken + Accumulate) // Mutual 2
+    .translate("readVarOrFunc", "success", whenFinishing, PushToken) // Mutual 3
+
+    .translate("waitForFuncOrOperator", "pushOperator", whenOperator, Accumulate)
+    .translate("waitForFuncOrOperator", "waitForFuncOrOperator", whenSpace)
+    .translate("waitForFuncOrOperator", "pushOpenBracket", whenOpenBracket, Accumulate)
+    .translate("waitForFuncOrOperator", "pushCloseBracket", whenCloseBracket, Accumulate)
+    .translate("waitForFuncOrOperator", "success", whenFinishing)
+    .translate("waitForFuncOrOperator", "pushOpenBracket", whenOpenBracket, Accumulate)
+    .translate("waitForFuncOrOperator", "errorExpectedFuncOrOperator")
+
     .translate("waitForOperator", "pushOperator", whenOperator, Accumulate)
     .translate("waitForOperator", "waitForOperator", whenSpace)
     .translate("waitForOperator", "pushCloseBracket", whenCloseBracket, Accumulate)
     .translate("waitForOperator", "success", whenFinishing)
     .translate("waitForOperator", "errorOperatorExpected")
     .translate("pushOperator", "readExpression", Match(Symbol.None), PushToken + setInnerOperand)
-    .translate("pushOperator", "pushOpenBracket", whenOpenBracket, PushToken + setBoundaryOperand)
+
     .describeError("errorDecimalPoint", "Two decimal points")
     .describeError("errorOperatorAtExpression", "Expected number or variable but got operator")
     .describeError("errorInvalidChar", "Invalid Char")
@@ -65,6 +88,7 @@ class SimpleExpressionParser(expression: String) extends StrictLogging {
     .describeError("errorOperatorExpected", "Operator expected")
     .describeError("errorBoundaryClosingBracket", "Cannot immediatly close expression")
     .describeError("errorUnbalanced", "Brackets are not balanced")
+    .describeError("errorExpectedFuncOrOperator", "Expected function or operator")
     .start("readExpression", ExpressionMemory())
 
 }

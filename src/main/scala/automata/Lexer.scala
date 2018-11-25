@@ -7,7 +7,7 @@ import scalaz.{-\/, \/, \/-}
 
 object Lexer extends StrictLogging {
 
-  def parse[M](expression: String, automata: LexerAutomata[M]): String \/ List[String] = {
+  def parse[M](expression: String, automata: LexerAutomata[M]): LexerError \/ List[String] = {
     var idx = 0
     val tokens = List.newBuilder[String]
     val symbols = expression + '\0'
@@ -22,7 +22,7 @@ object Lexer extends StrictLogging {
       val oldState = curr.state
 
       if (curr.error.isDefined)
-        return -\/(curr.error.get)
+        return -\/(LexerError(idx, curr.error.get))
 
       appendTokenIfExists(tokens, curr)
 
@@ -31,7 +31,7 @@ object Lexer extends StrictLogging {
       logIdleTransition(curr, oldState)
 
       if (curr.error.isDefined)
-        return -\/(curr.error.get)
+        return -\/(LexerError(idx, curr.error.get))
 
       appendTokenIfExists(tokens, curr)
 
@@ -52,3 +52,5 @@ object Lexer extends StrictLogging {
       tokens += curr.token.get
   }
 }
+
+case class LexerError(position: Int, message: String)

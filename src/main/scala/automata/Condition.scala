@@ -6,6 +6,8 @@ sealed abstract class Condition[-M] {
 
   def &&[Z <: M](that: Condition[Z]): Condition[Z]
     = ExprCondition({ (symb, mem, acc) => this.accepts(symb, mem, acc) && that.accepts(symb, mem, acc)})
+  def ||[Z <: M](that: Condition[Z]): Condition[Z]
+  = ExprCondition({ (symb, mem, acc) => this.accepts(symb, mem, acc) || that.accepts(symb, mem, acc)})
   def neg(): Condition[M] = ExprCondition({ (symb, mem, acc) => !this.accepts(symb, mem, acc)})
 }
 

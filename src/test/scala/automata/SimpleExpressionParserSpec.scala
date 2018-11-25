@@ -11,12 +11,15 @@ class SimpleExpressionParserSpec extends FlatSpec with Matchers {
     ("expression", "tokenCount"),
     ("1",                      1),
     ("1+2",                    3),
+    ("(1)",                    3),
     ("1+2+3",                  5),
     ("(1+2+3)",                7),
     ("(1 + 2)",                5),
     ("(1 + 2) + 3",            7),
-    (" ( 1 + 2 )+3+((4*4) )",  15),
-    ("((1 + 2) + 3)",           9)
+    (" ( 1 + 2 )+3+((4*4) )", 15),
+    ("((1 + 2) + 3)",          9),
+    ("1+2.0*3",                5),
+    ("ab + (1 + ba)",          7)
   )
 
   val parseNok = Table(
