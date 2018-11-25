@@ -13,11 +13,11 @@ object Lexer extends StrictLogging {
     val symbols = expression + '\0'
 
     var curr = automata
-    logger.debug("-> " + curr.state)
+    logger.debug("->  " + curr.state)
 
     while (idx < symbols.length()) {
       curr = curr << symbols(idx)
-      logger.debug("-> " + curr.state)
+      logger.debug("->  " + curr.state)
 
       val oldState = curr.state
 
@@ -44,7 +44,7 @@ object Lexer extends StrictLogging {
 
   private def logIdleTransition[M](current: LexerAutomata[M], oldState: String) = {
     if (current.state != oldState)
-      logger.debug("->>" + current.state + " " + (current match { case r: RunningAutomata[M] => r.memory; case _ => ""}))
+      logger.debug("->> " + current.state + " " + (current match { case r: RunningAutomata[M] => r.memory; case _ => ""}))
   }
 
   private def appendTokenIfExists[M](tokens: mutable.Builder[String, List[String]], curr: LexerAutomata[M]) = {
