@@ -5,17 +5,27 @@ import automata.{LexerError, Token}
 import scala.io.StdIn
 import scalaz.{-\/, \/-}
 
-object App {
+object Lab1ParserErrorDetection {
 
   def main(args: Array[String]): Unit = {
     while (true) {
       val input = StdIn.readLine("Enter expression: ")
-      val parser = new SimpleExpressionParser(input)
-      val result = parser.doLexing()
-      result match {
+      val parser = new SimpleExpressionParser(input, List("sin", "cos"))
+      val lexResult = parser.doLexing()
+
+      lexResult match {
         case -\/(LexerError(pos, message)) => printError(input, pos, message)
-        case \/-(tokens) => printTokens(tokens)
+        case \/-(tokens) =>
+          doSemAnalysis(parser, tokens)
       }
+    }
+  }
+
+  private def doSemAnalysis(parser: SimpleExpressionParser, tokens: List[Token]) = {
+    val semResult = parser.doSemAnalysis()
+    semResult match {
+      case Some(semError) => println(Console.RED + semError + Console.BLACK)
+      case None => printTokens(tokens)
     }
   }
 

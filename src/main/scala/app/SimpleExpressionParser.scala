@@ -5,14 +5,36 @@ import automata.Condition.{whenMemory, _}
 import automata._
 import com.typesafe.scalalogging.StrictLogging
 
-import scalaz.\/
+import scalaz.{\/, \/-}
 
-class SimpleExpressionParser(expression: String) extends StrictLogging {
+class SimpleExpressionParser(expression: String, unaryFunctions: List[String] = Nil) extends StrictLogging {
+  private var tokensOrTree: Option[List[Token]] = None
+
   def doLexing(): LexerError \/ List[Token] = {
     val result = Lexer.parse(expression, automata)
 
     logger.debug(s"Result of parsing $expression is $result")
+    updateStateWithTokenList(result)
     result
+  }
+
+
+  def doSemAnalysis(): Option[SemanticError] = {
+    require(tokensOrTree.isDefined, "Lexing was not performed before semantic analysis")
+
+    val invalidFunction = tokensOrTree.get
+      .filter(_.marker == TokenType.Function)
+      .filterNot(unaryFunctions contains _.value.toLowerCase)
+      .headOption
+
+    invalidFunction.map(SemanticError(_, "Function doesn't exist"))
+  }
+
+  private def updateStateWithTokenList(result: \/[LexerError, List[Token]]) = {
+    result match {
+      case \/-(tokens) => tokensOrTree = Some(tokens)
+      case _ =>
+    }
   }
 
   import app.ExpressionMemory._
@@ -125,4 +147,8 @@ private object ExpressionMemory {
   val whenOuterOperand: Condition[ExpressionMemory] = whenMemory({ !_.boundaryOperand })
   val whenBalancedBrackets: Condition[ExpressionMemory] = whenMemory({ _.openBrackets == 0 })
   val whenPositiveBrackets: Condition[ExpressionMemory] = whenMemory({ _.openBrackets > 0 })
+}
+
+case class SemanticError(token: Token, description: String) {
+  override def toString: String = s"Semantic error. Token $token: $description"
 }
