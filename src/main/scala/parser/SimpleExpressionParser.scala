@@ -1,4 +1,4 @@
-package app
+package parser
 
 import automata.Action._
 import automata.Condition.{whenMemory, _}
@@ -30,6 +30,10 @@ class SimpleExpressionParser(expression: String, unaryFunctions: List[String] = 
     invalidFunction.map(SemanticError(_, "Function doesn't exist"))
   }
 
+  def doTokenParsing() = {
+
+  }
+
   private def updateStateWithTokenList(result: \/[LexerError, List[Token]]) = {
     result match {
       case \/-(tokens) => tokensOrTree = Some(tokens)
@@ -37,8 +41,8 @@ class SimpleExpressionParser(expression: String, unaryFunctions: List[String] = 
     }
   }
 
-  import app.ExpressionMemory._
-  import app.TokenType._
+  import parser.ExpressionMemory._
+  import parser.TokenType._
 
   private val whenOperator = anyChar('-', '+', '*', '/')
   private val whenSpace = Match(' ')

@@ -1,8 +1,8 @@
 package automata
 
-import app.SimpleExpressionParser
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import org.scalatest.{FlatSpec, Matchers}
+import parser.SimpleExpressionParser
 
 import scalaz.\/-
 

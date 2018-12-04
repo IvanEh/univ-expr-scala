@@ -1,6 +1,7 @@
 package app
 
 import automata.{LexerError, Token}
+import parser.SimpleExpressionParser
 
 import scala.io.StdIn
 import scalaz.{-\/, \/-}
