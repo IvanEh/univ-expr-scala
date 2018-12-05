@@ -1,21 +1,39 @@
 package parser
 
-class ParallelAstOptimizer {
+case class ParallelAstOptimizer() {
+  val multiplicationOptimizer = ReverseOperationOptimizer(Operators.multiplication, Operators.division)
+  val additionOptimizer = ReverseOperationOptimizer(Operators.plus, Operators.minus)
+  val computedMarker = ComputedOperatorsMarker()
 
+  def optimize(expr: Expression): Expression = expr match {
+    case op: OperatorLike =>
+      var optimized = op remap { node => CommutativeOperatorLeftLeaningNormalization(node).visitAndMap() }
+
+      var iteration = 0
+      while (!optimized.isInstanceOf[ComputedOperator]) {
+        optimized = optimized
+          .remap { node => computedMarker.mark(node, iteration) }
+          .remap { node => multiplicationOptimizer.optimize(node, iteration) }
+          .remap { node => additionOptimizer.optimize(node, iteration)}
+        iteration = iteration + 1
+      }
+      optimized
+    case _ => expr
+  }
 }
 
-abstract class AstVisitingMapper(val target: Expression) {
+abstract class AstVisitingMapper(val target: OperatorLike) {
   protected def accepts(): Boolean
-  protected def doMap(): Expression
+  protected def doMap(): OperatorLike
 
-  final def visitAndMap(): Expression = if (accepts()) {
+  final def visitAndMap(): OperatorLike = if (accepts()) {
     doMap()
   } else {
     target
   }
 }
 
-case class CommutativeOperatorLeftLeaningNormalization(override val target: Operator) extends AstVisitingMapper(target) {
+case class CommutativeOperatorLeftLeaningNormalization(override val target: OperatorLike) extends AstVisitingMapper(target) {
 
   private val signature = target.signature
 
@@ -34,13 +52,12 @@ case class CommutativeOperatorLeftLeaningNormalization(override val target: Oper
   }
 }
 
-class ComputedOperator(that: OperatorLike) extends OperatorLike {
+class ComputedOperator(that: OperatorLike, val iteration: Int) extends OperatorLike {
   override val left: Expression = that.left
   override val right: Expression = that.right
   override val signature: OperatorSignature = that.signature
 
   override def toString = s"[${super.toString}]"
-
 
   def canEqual(other: Any): Boolean = other.isInstanceOf[ComputedOperator]
 
@@ -49,53 +66,79 @@ class ComputedOperator(that: OperatorLike) extends OperatorLike {
       (that canEqual this) &&
         left == that.left &&
         right == that.right &&
-        signature == that.signature
+        signature == that.signature &&
+        iteration == that.iteration
     case _ => false
   }
 
   override def hashCode(): Int = {
-    val state = Seq(left, right, signature)
+    val state = Seq(left, right, signature, iteration)
     state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
+  }
+}
+
+case class ComputedOperatorsMarker() {
+  def mark(operator: OperatorLike, iteration: Int): OperatorLike = {
+    if (isComputedPreviously(operator.left, iteration) && isComputedPreviously(operator.right, iteration))
+      new ComputedOperator(operator, iteration)
+    else
+      operator
+  }
+
+  private def isComputedPreviously(operator: Expression, iterator: Int) = operator match {
+    case c: ComputedOperator => iterator > c.iteration
+    case _: OperatorLike => false
+    case _ => true
   }
 }
 
 case class ReverseOperationOptimizer(commutative: OperatorSignature, reverse: OperatorSignature) {
 
-
-  def optimize(op: OperatorLike): OperatorLike = {
-    if (matchingOperator(op) && isComputed(op.right) && op.left.isInstanceOf[OperatorLike])
-      doOptimize(op)
+  def optimize(op: OperatorLike, iteration: Int): OperatorLike = {
+    if (matchingOperator(op) && isComputedPreviously(op.right, iteration) && isLeftLeaning(op)
+      && !isComputed(op.left.asInstanceOf[OperatorLike])
+      && !isComputed(op))
+      doOptimize(op, iteration)
     else
       op
   }
 
+  private def isComputed(op: OperatorLike): Boolean = op match {
+    case _: ComputedOperator => true
+    case _ => false
+  }
+
+
+  private def isLeftLeaning(op: OperatorLike) = {
+    op.left.isInstanceOf[OperatorLike]
+  }
 
   private def matchingOperator(op: OperatorLike) = {
     (commutative, reverse).productIterator contains op.signature
   }
 
-  protected def doOptimize(parent: OperatorLike): OperatorLike = {
+  protected def doOptimize(parent: OperatorLike, iteration: Int): OperatorLike = {
     val (newChild: OperatorLike, replaced) = parent.left.asInstanceOf[OperatorLike]
-      .replaceFirstLeft(child => isComputed(child.right) || isComputed(child.left) || !matchingOperator(child)) { child =>
+      .replaceFirstLeft(child => anyComputed(child, iteration) || !matchingOperator(child)) { child =>
 
       if (!matchingOperator(child)) // Switch of operator happened
         child
       else
-        if(isComputed(child.left))
-          new ComputedOperator(Operator(child.left, parent.right, child.signature))
-        else if (isComputed(child.right))
+        if(isComputedPreviously(child.left, iteration))
+          new ComputedOperator(Operator(child.left, parent.right, parent.signature), iteration)
+        else if (isComputedPreviously(child.right, iteration))
           (parent.signature.commutative, child.signature.commutative) match {
             case (true, true) =>
-              val computed = new ComputedOperator(Operator(child.right, parent.right, parent.signature))
+              val computed = new ComputedOperator(Operator(child.right, parent.right, parent.signature), iteration)
               Operator(child.left, computed, commutative)
             case (true, false) =>
-              val computed = new ComputedOperator(Operator(parent.right, child.right, reverse))
+              val computed = new ComputedOperator(Operator(parent.right, child.right, reverse), iteration)
               Operator(child.left, computed, commutative)
             case (false, true) =>
-              val computed = new ComputedOperator(Operator(child.right, parent.right, reverse))
+              val computed = new ComputedOperator(Operator(child.right, parent.right, reverse), iteration)
               Operator(child.left, computed, commutative)
             case (false, false) =>
-              val computed = new ComputedOperator(Operator(child.right, parent.right, commutative))
+              val computed = new ComputedOperator(Operator(child.right, parent.right, commutative), iteration)
               Operator(child.left, computed, reverse)
           }
         else
@@ -103,7 +146,7 @@ case class ReverseOperationOptimizer(commutative: OperatorSignature, reverse: Op
     }
 
     if (matchingOperator(replaced)) {
-      if (isComputed(replaced.left))
+      if (isComputedPreviously(replaced.left, iteration))
         Operator(newChild, replaced.right, replaced.signature)
       else
         newChild
@@ -113,10 +156,14 @@ case class ReverseOperationOptimizer(commutative: OperatorSignature, reverse: Op
 
   }
 
+  private def anyComputed(child: OperatorLike, iteration: Int) = {
+    isComputedPreviously(child.right, iteration) || isComputedPreviously(child.left, iteration)
+  }
+
   def isSameOperation(high: OperatorLike, low: OperatorLike): Boolean = high.signature == low.signature
 
-  private def isComputed(expr: Expression) = expr match {
-    case _: ComputedOperator => true
+  private def isComputedPreviously(expr: Expression, iteration: Int): Boolean = expr match {
+    case op: ComputedOperator => iteration > op.iteration
     case _: OperatorLike => false
     case _ => true
   }
