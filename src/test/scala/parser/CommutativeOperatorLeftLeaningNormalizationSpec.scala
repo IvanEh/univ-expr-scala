@@ -23,6 +23,6 @@ class CommutativeOperatorLeftLeaningNormalizationSpec extends FlatSpec with Matc
   }
 
   private def checkNormalization(input: Operator, expected: Operator) = {
-    CommutativeOperatorLeftLeaningNormalization(input).normalized() shouldBe expected
+    CommutativeOperatorLeftLeaningNormalization(input).visitAndMap() shouldBe expected
   }
 }

@@ -18,22 +18,63 @@ case class Variable(name: String) extends Atom {
   override def toString: String = name.toString
 }
 
-case class Operator(left: Expression, right: Expression, signature: OperatorSignature) extends Expression {
+trait OperatorLike extends Expression {
+  val left: Expression
+  val right: Expression
+  val signature: OperatorSignature
 
-  def replaceLeftMost(node: Expression): (Operator, Expression) = {
-    if (!left.isInstanceOf[Operator]) {
-      val newNode = Operator(node, right, signature)
-      (newNode, left)
+  def collectLeft(): List[OperatorLike] = left match {
+    case leftOp: Operator => this :: leftOp.collectLeft()
+    case _ => this :: Nil
+  }
+
+  def remap(mapper: OperatorLike => OperatorLike): OperatorLike = {
+    val newLeft = left match {
+      case leftOp: Operator => leftOp.remap(mapper)
+      case _ => left
+    }
+    val newRight = right match {
+      case rightOp: Operator => rightOp.remap(mapper)
+      case _ => right
+    }
+    if (newLeft == left && newRight == right) {
+      mapper(this)
     } else {
-      val result = left.asInstanceOf[Operator].replaceLeftMost(node)
+      mapper(Operator(newLeft, newRight, signature))
+    }
+  }
+
+  def replaceFirstLeft(filter: OperatorLike => Boolean)(replacer: OperatorLike => Expression): (Expression, OperatorLike) = {
+    if (filter(this)) {
+      (replacer(this), this)
+    } else {
+      val result = left match {
+        case leftOp: OperatorLike => leftOp.replaceFirstLeft(filter)(replacer)
+        case _ => (left, this)
+      }
+      
       (Operator(result._1, right, signature), result._2)
     }
   }
 
-  def nonLeafOperator(): Boolean = left.isInstanceOf[Operator] || right.isInstanceOf[Operator]
+  def replaceLeftMost(node: Expression): (OperatorLike, Expression) = {
+    if (!left.isInstanceOf[OperatorLike]) {
+      val newNode = Operator(node, right, signature)
+      (newNode, left)
+    } else {
+      val result = left.asInstanceOf[OperatorLike].replaceLeftMost(node)
+      (Operator(result._1, right, signature), result._2)
+    }
+  }
+
+  def nonLeafOperator(): Boolean = left.isInstanceOf[OperatorLike] || right.isInstanceOf[OperatorLike]
   def leafOperator(): Boolean = !nonLeafOperator()
 
   override def toString: String = s"($left${signature.sign}$right)"
+}
+
+case class Operator(left: Expression, right: Expression, signature: OperatorSignature) extends OperatorLike {
+
 }
 
 case class OperatorSignature(sign: Char, precedence: Int, commutative: Boolean = false)
